@@ -1,4 +1,5 @@
 import discord
+import json
 import logging
 import urllib
 
@@ -7,9 +8,9 @@ from datetime import datetime
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from os import environ
-from youtube_dl import YoutubeDL
 from random import randint
 import time
+from youtube_dl import YoutubeDL
 
 logging.basicConfig(
     handlers=[logging.FileHandler("bot.log", 'w', 'utf-8')],
@@ -27,6 +28,16 @@ intents = discord.Intents.all()
 client = commands.Bot(command_prefix=PREFIX, intents=intents)
 
 global queues; queues = {}
+perish_limit = 5
+
+def perish_validate():
+    try:
+        with open("perish.json") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(e)
+        with open("perish.json", "w") as f:
+            json.dump({}, f)
 
 
 @client.event
@@ -189,20 +200,47 @@ async def on_message(message):
             await message.channel.send("👍")
         
         elif message.content[1:].lower() == "perish":
-            channel = await client.fetch_channel(BALLS_CHANNEL)
-            member = channel.members[randint(0, len(channel.members)-1)]
-            t = 5
-            while t:
-                await message.channel.send(f"Perish: {t}")
-                time.sleep(1)
-                t -= 1
-            await message.channel.send(f"Perish: Wagwan {member.nick}")
-            time.sleep(0.5)
-            await member.move_to(None)
+            perish_validate()
+            with open("perish.json") as f:
+                data = json.load(f)
+            try:
+                remaining = data[str(message.author.id)]
+                if remaining is not 0:
+                    data[str(message.author.id)] -= 1
+            except KeyError as e:
+                print(e)
+                remaining = perish_limit - 1
+                data[str(message.author.id)] = remaining
+            finally:
+                print(data)
+                with open("perish.json", "w") as f:
+                    json.dump(data, f)
+
+            if remaining != 0:
+                print("Perish")
+                channel = await client.fetch_channel(BALLS_CHANNEL)
+                if len(channel.members) > 0:
+                    member = channel.members[randint(0, len(channel.members)-1)]
+                    # t = 5
+                    # while t:
+                    #     await message.channel.send(f"Perish: {t}")
+                    #     time.sleep(1)
+                    #     t -= 1
+                    # await message.channel.send(f"Perish: Wagwan {member.nick}")
+                    # time.sleep(0.5)
+                    # await member.move_to(None)
+                else:
+                    await message.channel.send("Perish: No members in voice channel")
+            else:
+                if message.author.voice is not None:
+                    await message.channel.send(f"Perish: Wagwan {message.author.nick}")
+                    time.sleep(0.5)
+                    await message.author.move_to(None)
+                else:
+                    await message.channel.send("Perish: You may not perish today")
         
         elif message.content.split()[0][1:].lower() in ["select", "downitfresher"]:
             try:
-                member = message.mentions[randint(0, len(message.mentions)-1)]
                 t = 5
                 while t:
                     await message.channel.send(
@@ -210,8 +248,9 @@ async def on_message(message):
                     )
                     time.sleep(1)
                     t -= 1
+                text = message.content.split()[randint(1, len(message.content.split())-1)]
                 await message.channel.send(
-                    f"{message.content.split()[0][1:].lower().capitalize()}: {member.mention}"
+                    f"{message.content.split()[0][1:].lower().capitalize()}: {text}"
                 )
             except:
                 pass
