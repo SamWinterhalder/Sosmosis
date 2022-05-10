@@ -221,14 +221,14 @@ async def on_message(message):
                 channel = await client.fetch_channel(BALLS_CHANNEL)
                 if len(channel.members) > 0:
                     member = channel.members[randint(0, len(channel.members)-1)]
-                    # t = 5
-                    # while t:
-                    #     await message.channel.send(f"Perish: {t}")
-                    #     time.sleep(1)
-                    #     t -= 1
-                    # await message.channel.send(f"Perish: Wagwan {member.nick}")
-                    # time.sleep(0.5)
-                    # await member.move_to(None)
+                    t = 5
+                    while t:
+                        await message.channel.send(f"Perish: {t}")
+                        time.sleep(1)
+                        t -= 1
+                    await message.channel.send(f"Perish: Wagwan {member.nick}")
+                    time.sleep(0.5)
+                    await member.move_to(None)
                 else:
                     await message.channel.send("Perish: No members in voice channel")
             else:
