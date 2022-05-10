@@ -1,6 +1,7 @@
 .env
 bot.log
 run.sh
+perish.json
 
 venv/
 
