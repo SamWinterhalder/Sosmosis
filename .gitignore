@@ -1,7 +1,7 @@
 .env
 bot.log
 run.sh
-perish.json
+user_data.json
 
 venv/
 

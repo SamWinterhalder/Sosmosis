@@ -29,15 +29,32 @@ client = commands.Bot(command_prefix=PREFIX, intents=intents)
 
 global queues; queues = {}
 perish_limit = 5
+split_limit = 1
 
-def perish_validate():
+def update_user_remaining(file_name, id, command):
     try:
-        with open("perish.json") as f:
+        with open(file_name) as f:
             data = json.load(f)
     except Exception as e:
         print(e)
-        with open("perish.json", "w") as f:
+        with open(file_name, "w") as f:
             json.dump({}, f)
+
+    with open(file_name) as f:
+        data = json.load(f)
+    try:
+        remaining = data[id]["perish"]
+        if remaining is not 0:
+            data[id]["perish"] -= 1
+    except KeyError as e:
+        print(e)
+        remaining = perish_limit - 1
+        data[id] = { "perish": remaining }
+    finally:
+        print(data)
+        with open(file_name, "w") as f:
+            json.dump(data, f)
+    return remaining
 
 
 @client.event
@@ -200,22 +217,7 @@ async def on_message(message):
             await message.channel.send("👍")
         
         elif message.content[1:].lower() == "perish":
-            perish_validate()
-            with open("perish.json") as f:
-                data = json.load(f)
-            try:
-                remaining = data[str(message.author.id)]
-                if remaining is not 0:
-                    data[str(message.author.id)] -= 1
-            except KeyError as e:
-                print(e)
-                remaining = perish_limit - 1
-                data[str(message.author.id)] = remaining
-            finally:
-                print(data)
-                with open("perish.json", "w") as f:
-                    json.dump(data, f)
-
+            remaining = update_user_remaining("user_data.json", str(message.author.id), "perish")
             if remaining != 0:
                 print("Perish")
                 channel = await client.fetch_channel(BALLS_CHANNEL)
@@ -233,7 +235,8 @@ async def on_message(message):
                     await message.channel.send("Perish: No members in voice channel")
             else:
                 if message.author.voice is not None:
-                    await message.channel.send(f"Perish: Wagwan {message.author.nick}")
+                    nick = message.author.nick if message.author.nick is not None else message.author.name;
+                    await message.channel.send(f"Perish: Wagwan {nick}")
                     time.sleep(0.5)
                     await message.author.move_to(None)
                 else:
@@ -254,6 +257,9 @@ async def on_message(message):
                 )
             except:
                 pass
+        
+        elif message.content[1:].lower() == "traditional":
+            pass
 
     elif "wag" in message.content.lower().split(" "):
         await message.channel.send("wag")
