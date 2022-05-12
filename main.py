@@ -30,7 +30,7 @@ client = commands.Bot(command_prefix=PREFIX, intents=intents)
 
 global queues; queues = {}
 perish_limit = 5
-traditional_limit = 2
+traditional_limit = 1
 
 def update_user_remaining(file_name, id, command, limit):
     try:
@@ -274,10 +274,17 @@ async def on_message(message):
                 og_channel = await client.fetch_channel(BALLS_CHANNEL)
                 new_channel = await client.fetch_channel(KITCHEN_CHANNEL)
                 if len(og_channel.members) > 0:
+                    t = 5
+                    while t:
+                        await message.channel.send(f"Traditional: {t}")
+                        time.sleep(1)
+                        t -= 1
                     selected_members = sample(og_channel.members, round(len(og_channel.members)/2))
                     for member in selected_members:
                         try:
-                            print(member.nick)
+                            time.sleep(1)
+                            member_name = member.nick if member.nick is not None else member.name
+                            await message.channel.send(f"Traditional: Wagwan {member_name}")
                             await member.move_to(new_channel)
                         except Exception as e:
                             print(e)
