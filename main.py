@@ -8,7 +8,7 @@ from datetime import datetime
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from os import environ
-from random import randint
+from random import randint, sample
 import time
 from youtube_dl import YoutubeDL
 
@@ -21,6 +21,7 @@ load_dotenv()
 TOKEN = environ.get('TOKEN')
 GAMERNET_GUILD = environ.get('GAMERNET_GUILD')
 BALLS_CHANNEL = environ.get('BALLS_CHANNEL')
+KITCHEN_CHANNEL = environ.get('KITCHEN_CHANNEL')
 SOS_URL = environ.get('SOS_URL')
 
 PREFIX = "#"
@@ -29,9 +30,9 @@ client = commands.Bot(command_prefix=PREFIX, intents=intents)
 
 global queues; queues = {}
 perish_limit = 5
-split_limit = 1
+traditional_limit = 2
 
-def update_user_remaining(file_name, id, command):
+def update_user_remaining(file_name, id, command, limit):
     try:
         with open(file_name) as f:
             data = json.load(f)
@@ -43,13 +44,17 @@ def update_user_remaining(file_name, id, command):
     with open(file_name) as f:
         data = json.load(f)
     try:
-        remaining = data[id]["perish"]
+        remaining = data[id][command]
         if remaining is not 0:
-            data[id]["perish"] -= 1
+            data[id][command] -= 1
     except KeyError as e:
         print(e)
-        remaining = perish_limit - 1
-        data[id] = { "perish": remaining }
+        remaining = limit - 1
+        try:
+            data[id][command] = remaining
+        except KeyError as e:
+            print(e)
+            data[id] = { command: remaining }
     finally:
         print(data)
         with open(file_name, "w") as f:
@@ -120,7 +125,6 @@ def after_song(guild):
 
 
 help_msg = discord.Embed(title="Commands", url=SOS_URL, description="```\njoin                Sosmosis joins the current channel\nleave               Sosmosis leave the current channel\nplay                Plays the following Youtube URL\npause               Pause music playback\nresume              Resume music playback\nstop                End current song\nskip                Start playing next song in the queue\nqueue               Display the current queue\nclearqueue          Remove all songs from the queue\n```", color=57599)
-
 
 @client.event
 async def on_message(message):
@@ -217,7 +221,9 @@ async def on_message(message):
             await message.channel.send("👍")
         
         elif message.content[1:].lower() == "perish":
-            remaining = update_user_remaining("user_data.json", str(message.author.id), "perish")
+            remaining = update_user_remaining(
+                "user_data.json", str(message.author.id), "perish", perish_limit
+                )
             if remaining != 0:
                 print("Perish")
                 channel = await client.fetch_channel(BALLS_CHANNEL)
@@ -259,7 +265,32 @@ async def on_message(message):
                 pass
         
         elif message.content[1:].lower() == "traditional":
-            pass
+            remaining = update_user_remaining(
+                "user_data.json", str(message.author.id), "traditional", traditional_limit
+                )
+            print(remaining)
+            if remaining != 0:
+                print("Traditional")
+                og_channel = await client.fetch_channel(BALLS_CHANNEL)
+                new_channel = await client.fetch_channel(KITCHEN_CHANNEL)
+                if len(og_channel.members) > 0:
+                    selected_members = sample(og_channel.members, round(len(og_channel.members)/2))
+                    for member in selected_members:
+                        try:
+                            print(member.nick)
+                            await member.move_to(new_channel)
+                        except Exception as e:
+                            print(e)
+                else:
+                    await message.channel.send("Traditional: No members in voice channel")
+            else:
+                if message.author.voice is not None:
+                    nick = message.author.nick if message.author.nick is not None else message.author.name;
+                    await message.channel.send(f"Traditional: Wagwan {nick}")
+                    time.sleep(0.5)
+                    await message.author.move_to(None)
+                else:
+                    await message.channel.send("Traditional: You may not do this today")
 
     elif "wag" in message.content.lower().split(" "):
         await message.channel.send("wag")
