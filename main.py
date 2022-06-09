@@ -12,6 +12,9 @@ from random import randint, sample
 import time
 from youtube_dl import YoutubeDL
 
+import requests
+import re
+
 logging.basicConfig(
     handlers=[logging.FileHandler("bot.log", 'w', 'utf-8')],
     level=logging.INFO
@@ -19,9 +22,10 @@ logging.basicConfig(
 
 load_dotenv()
 TOKEN = environ.get('TOKEN')
-GAMERNET_GUILD = environ.get('GAMERNET_GUILD')
-BALLS_CHANNEL = environ.get('BALLS_CHANNEL')
-KITCHEN_CHANNEL = environ.get('KITCHEN_CHANNEL')
+BALLS_CHANNEL_ID = environ.get('BALLS_CHANNEL_ID')
+KITCHEN_CHANNEL_ID = environ.get('KITCHEN_CHANNEL_ID')
+TEST_CHANNEL_ID = environ.get('TEST_CHANNEL_ID')
+
 SOS_URL = environ.get('SOS_URL')
 
 PREFIX = "#"
@@ -37,7 +41,6 @@ def update_user_remaining(file_name, id, command, limit):
         with open(file_name) as f:
             data = json.load(f)
     except Exception as e:
-        print(e)
         with open(file_name, "w") as f:
             json.dump({}, f)
 
@@ -45,18 +48,15 @@ def update_user_remaining(file_name, id, command, limit):
         data = json.load(f)
     try:
         remaining = data[id][command]
-        if remaining is not 0:
+        if remaining != 0:
             data[id][command] -= 1
     except KeyError as e:
-        print(e)
         remaining = limit - 1
         try:
             data[id][command] = remaining
         except KeyError as e:
-            print(e)
             data[id] = { command: remaining }
     finally:
-        print(data)
         with open(file_name, "w") as f:
             json.dump(data, f)
     return remaining
@@ -72,8 +72,9 @@ async def on_ready():
 
     for guild in client.guilds:
         queues[guild.id] = []
-
-    print('Ready')
+    
+    test_chan = await client.fetch_channel(TEST_CHANNEL_ID)
+    await test_chan.send("Ready")
 
 
 def get_title(url: str) -> str:
@@ -124,8 +125,6 @@ def after_song(guild):
         logging.info("[queue] No songs left in queue")
 
 
-help_msg = discord.Embed(title="Commands", url=SOS_URL, description="```\njoin                Sosmosis joins the current channel\nleave               Sosmosis leave the current channel\nplay                Plays the following Youtube URL\npause               Pause music playback\nresume              Resume music playback\nstop                End current song\nskip                Start playing next song in the queue\nqueue               Display the current queue\nclearqueue          Remove all songs from the queue\n```", color=57599)
-
 @client.event
 async def on_message(message):
     if message.author == client.user:
@@ -133,6 +132,7 @@ async def on_message(message):
 
     if message.content.startswith(PREFIX):
         if message.content.split()[0][1:].lower() == "help":
+            help_msg = discord.Embed(title="Commands", url=SOS_URL, description="```\njoin                Sosmosis joins the current channel\nleave               Sosmosis leave the current channel\nplay                Plays the following Youtube URL\npause               Pause music playback\nresume              Resume music playback\nstop                End current song\nskip                Start playing next song in the queue\nqueue               Display the current queue\nclearqueue          Remove all songs from the queue\n```", color=57599)
             await message.channel.send(embed=help_msg)
 
         elif message.content.split()[0][1:].lower() == "join":
@@ -225,8 +225,7 @@ async def on_message(message):
                 "user_data.json", str(message.author.id), "perish", perish_limit
                 )
             if remaining != 0:
-                print("Perish")
-                channel = await client.fetch_channel(BALLS_CHANNEL)
+                channel = await client.fetch_channel(BALLS_CHANNEL_ID)
                 if len(channel.members) > 0:
                     member = channel.members[randint(0, len(channel.members)-1)]
                     t = 5
@@ -234,7 +233,8 @@ async def on_message(message):
                         await message.channel.send(f"Perish: {t}")
                         time.sleep(1)
                         t -= 1
-                    await message.channel.send(f"Perish: Wagwan {member.nick}")
+                    nick = member.nick if member.nick is not None else member.name;
+                    await message.channel.send(f"Perish: Wagwan {nick}")
                     time.sleep(0.5)
                     await member.move_to(None)
                 else:
@@ -264,15 +264,13 @@ async def on_message(message):
             except:
                 pass
         
-        elif message.content[1:].lower() == "traditional":
+        elif message.content[1:].lower() in ["traditional", "woman", "makemeasandwich"]:
             remaining = update_user_remaining(
                 "user_data.json", str(message.author.id), "traditional", traditional_limit
                 )
-            print(remaining)
             if remaining != 0:
-                print("Traditional")
-                og_channel = await client.fetch_channel(BALLS_CHANNEL)
-                new_channel = await client.fetch_channel(KITCHEN_CHANNEL)
+                og_channel = await client.fetch_channel(BALLS_CHANNEL_ID)
+                new_channel = await client.fetch_channel(KITCHEN_CHANNEL_ID)
                 if len(og_channel.members) > 0:
                     t = 5
                     while t:
@@ -285,6 +283,7 @@ async def on_message(message):
                             time.sleep(1)
                             member_name = member.nick if member.nick is not None else member.name
                             await message.channel.send(f"Traditional: Wagwan {member_name}")
+                            time.sleep(0.5)
                             await member.move_to(new_channel)
                         except Exception as e:
                             print(e)
@@ -299,11 +298,26 @@ async def on_message(message):
                 else:
                     await message.channel.send("Traditional: You may not do this today")
 
-    elif "wag" in message.content.lower().split(" "):
-        await message.channel.send("wag")
-    
-    elif "wagwan" in message.content.lower().split(" "):
-        await message.channel.send("wagwan")
+        elif message.content.split()[0][1:] == "happybirthday":
+            channel = await client.fetch_channel(int(message.content.split()[1]))
+            await channel.send(f"Happy Birthday {message.content.split(' ', 2)[3]}, there is now a wider age gap between you and a 16 year old")
+
+        elif message.content.split()[0][1:] == "spiked":
+            page = requests.get(
+                "https://www.spiked-online.com/")
+            soup = BeautifulSoup(page.content, 'html.parser')
+
+            all_links = []
+            links = soup.select('a')
+            for ahref in links:
+                href = ahref.get('href')
+                href = href.strip() if href is not None else ''
+
+                if re.search(r'/[0-9]+/[0-9]+/[0-9]+/', href):
+                    all_links.append(href)
+
+            link = all_links[randint(0, len(all_links)-1)]
+            await message.channel.send(link)
 
 
 client.run(TOKEN)
